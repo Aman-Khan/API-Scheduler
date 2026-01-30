@@ -34,12 +34,12 @@ To keep the codebase modular and extensible, we utilized several GoF design patt
 * If the server was down for an hour, all missed jobs become "due" immediately.
 * The scheduler picks them up and resumes execution instantly.
 
-
-
 ---
 
 ## 📐 Low-Level Design (LLD)
+
 ![Alt text for image](./low_level_design.svg)
+
 This system separates **Data (Entities)** from **Behavior (Services)** to ensure testability and modularity.
 
 ### 1. Entity-Relationship Model (Data Layer)
@@ -85,7 +85,7 @@ We implemented specific GoF patterns to handle complexity:
 
 1. **Clone the repository:**
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/Aman-Khan/API-Scheduler
 cd api_scheduler/backend
 
 ```
@@ -241,3 +241,50 @@ POST /schedules/
 ```
 
 **Result:** `422 Unprocessable Entity` with message: *"Rate (Interval 3600s) cannot be greater than the Window duration"*.
+
+---
+
+## ⚖️ Trade-offs & Limitations
+
+While the current architecture is robust for standard use cases, certain design choices were made to prioritize simplicity and ease of setup over massive horizontal scalability.
+
+1. **SQLite vs. High Concurrency:**
+* **Limitation:** SQLite uses a file-level write lock. While we use a `ThreadPoolExecutor` for network requests, the database itself cannot handle thousands of concurrent *writes* per second.
+* **Impact:** If you spin up multiple instances of this API (e.g., via Docker), they will contend for the same file, potentially causing "Database Locked" errors.
+* **Constraint:** This system is designed to run as a **single instance**.
+
+
+2. **In-Memory Job Execution:**
+* **Limitation:** The HTTP requests are triggered by a Python thread in the same process as the API.
+* **Impact:** A heavy load of concurrent network requests could consume all server memory/CPU, degrading the API's responsiveness (e.g., user endpoints might get slow).
+
+
+3. **Polling Precision:**
+* **Limitation:** The scheduler loop sleeps for 5 seconds between checks.
+* **Impact:** Jobs are not guaranteed to run at the *exact* millisecond they are scheduled. There is a potential drift of 0-5 seconds.
+
+
+
+---
+
+## 🔮 Future Improvements (Production Readiness)
+
+To take this system from a robust utility to a high-scale enterprise service, the following upgrades are recommended:
+
+1. **Database Migration (PostgreSQL):**
+* Replace SQLite with **PostgreSQL**.
+* Utilize `SELECT ... FOR UPDATE SKIP LOCKED`. This allows running **multiple scheduler instances** (Horizontal Scaling) where each instance grabs a unique batch of jobs without overlapping.
+
+
+2. **Distributed Task Queue (Celery/Redis):**
+* Decouple the **Scheduler** (finding jobs) from the **Executor** (running jobs).
+* Instead of running `requests.get` inside the API thread, push a message to a **Redis Queue**.
+* Have a separate fleet of **Celery Workers** consume these messages. This allows you to scale the "runners" independently of the "scheduler."
+
+
+3. **Resilience & Retries:**
+* Implement an "Exponential Backoff" strategy. If a target returns `500 Internal Server Error`, the system should automatically retry after 1s, 2s, 4s, etc., before marking it as `FAILURE`.
+
+
+4. **Security:**
+* Add **API Key Authentication** or OAuth2 to protect the endpoints, ensuring only authorized users can create or delete schedules.
