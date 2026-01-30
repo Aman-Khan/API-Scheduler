@@ -12,11 +12,21 @@ import models
 import schemas
 from core_logic import ScheduleContext, JobExecutor, DatabaseLoggerObserver
 from models import ScheduleStatus, RunStatus
+from fastapi.middleware.cors import CORSMiddleware
+
 
 # Create DB Tables (safe to run multiple times, won't overwrite existing data unless dropped)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="API Scheduler")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # --- BACKGROUND SCHEDULER ENGINE ---
 def run_scheduler():
