@@ -1,42 +1,54 @@
 import { useQuery } from '@tanstack/react-query';
 import { Activity, TrendingUp, CheckCircle2, Zap, Clock, ShieldCheck, ArrowUpRight, Cpu } from 'lucide-react';
-import { getMetrics } from '../api/client';
+// Ensure this imports your fetch wrapper correctly
+import { getMetrics } from '../api/client'; 
 
 const Dashboard = () => {
-  const { data: metrics, isLoading } = useQuery({
-    queryKey: ['metrics'],
+  const { data: metrics, isLoading, isError } = useQuery({
+    queryKey: ['dashboard_metrics'],
     queryFn: async () => {
-      const response = await getMetrics();
+      // Make sure your client hits the new endpoint '/metrics/dashboard'
+      const response = await getMetrics(); 
       return response.data;
     },
     refetchInterval: 5000,
   });
 
-  const successRate = metrics?.total_runs
-    ? ((metrics.success_runs / metrics.total_runs) * 100).toFixed(1)
+  // 1. Safe Accessors (Handle loading/undefined states)
+  const system = metrics?.system || {};
+  const db = metrics?.database || {};
+
+  // 2. Logic extraction
+  const isDbOnline = db.online;
+  const isHighLoad = system.cpu_usage_percent > 80;
+
+  // 3. Calculate Success Rate (Using the new nested data)
+  const successRate = system.total_runs > 0
+    ? ((system.success_runs / system.total_runs) * 100).toFixed(1)
     : 0;
 
   if (isLoading) return <div className="p-8 animate-pulse bg-slate-50/50 h-screen" />;
+  if (isError) return <div className="p-8 text-red-500 font-bold">⚠️ Connection lost to backend telemetry.</div>;
 
   return (
     <div className="p-8 max-w-[1400px] mx-auto space-y-8 bg-slate-50/30">
       
-      {/* 💎 Header: Clean & Authoritative */}
+      {/* 💎 Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-200 pb-8">
         <div>
-          <div className="flex items-center gap-2 mb-2">
-          </div>
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">System Metrics</h1>
           <p className="text-slate-500 text-sm mt-1 font-medium">Real-time telemetry from your API automation engine.</p>
         </div>
         
         <div className="flex items-center gap-4 bg-white p-2 rounded-2xl shadow-sm border border-slate-200/60">
-          <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 rounded-xl border border-emerald-100">
+          <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border ${isDbOnline ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
             <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              <span className={`absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping ${isDbOnline ? 'bg-emerald-400' : 'bg-red-400'}`} />
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${isDbOnline ? 'bg-emerald-500' : 'bg-red-500'}`} />
             </span>
-            <span className="text-emerald-700 text-xs font-bold uppercase tracking-widest">Operational</span>
+            <span className={`text-xs font-bold uppercase tracking-widest ${isDbOnline ? 'text-emerald-700' : 'text-red-700'}`}>
+              {isDbOnline ? 'Operational' : 'System Critical'}
+            </span>
           </div>
         </div>
       </div>
@@ -45,7 +57,7 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
         {/* Total Runs Card */}
-        <div className="relative overflow-hidden bg-white border border-slate-200/60 p-6 rounded-[1.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all group">
+        <div className="relative overflow-hidden bg-white border border-slate-200/60 p-6 rounded-[1.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] group">
           <div className="absolute -right-4 -top-4 text-blue-500/5 group-hover:scale-110 transition-transform">
              <TrendingUp size={120} />
           </div>
@@ -55,7 +67,8 @@ const Dashboard = () => {
             </div>
             <div className="text-right">
                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Runs</p>
-               <h3 className="text-3xl font-black text-slate-900 tabular-nums">{metrics?.total_runs || 0}</h3>
+               {/* Update: Read from system.total_runs */}
+               <h3 className="text-3xl font-black text-slate-900 tabular-nums">{system.total_runs || 0}</h3>
             </div>
           </div>
           <div className="flex items-center gap-2 text-[10px] font-bold py-1 px-2 bg-emerald-50 text-emerald-600 rounded-md w-fit">
@@ -87,8 +100,9 @@ const Dashboard = () => {
             </div>
             <div className="text-right">
                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Performance</p>
+               {/* Update: Read from system.avg_latency_ms */}
                <h3 className="text-3xl font-black text-slate-900 tabular-nums">
-                {metrics?.avg_latency_ms ? `${metrics.avg_latency_ms.toFixed(0)}ms` : '0ms'}
+                {system.avg_latency_ms ? `${system.avg_latency_ms.toFixed(0)}ms` : '0ms'}
                </h3>
             </div>
           </div>
@@ -111,11 +125,20 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             {[
-              { label: 'Primary DB', val: 'Connected', sub: 'Stable 1.2ms', color: 'bg-blue-500' },
-              { label: 'Worker Nodes', val: '4 Active', sub: 'CPU Load 12%', color: 'bg-purple-500' },
-              { label: 'Auth Gateway', val: 'Healthy', sub: 'Cert: Valid', color: 'bg-emerald-500' },
+              { 
+                label: 'Primary DB', 
+                val: isDbOnline ? 'Connected' : 'Offline', 
+                sub: isDbOnline ? `Latency ${db.latency_ms}ms` : 'Check Logs', 
+                color: isDbOnline ? 'bg-blue-500' : 'bg-red-500'
+              },
+              { 
+                label: 'Worker Nodes', 
+                val: `${system.active_workers || 0} Active`, 
+                sub: `CPU Load ${system.cpu_usage_percent || 0}%`, 
+                color: 'bg-purple-500' 
+              },
             ].map((node, i) => (
               <div key={i} className="relative pl-6">
                 <div className={`absolute left-0 top-1 bottom-1 w-1 rounded-full ${node.color} opacity-40`} />
@@ -127,21 +150,27 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* 🕒 Time Card - NOW IN THE SAME LIGHT COLOR SCHEME */}
+        {/* 🕒 Time Card */}
         <div className="bg-blue-50/50 border border-blue-100 rounded-[1.5rem] p-8 relative overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
           <div className="absolute top-0 right-0 w-32 h-32 bg-blue-200/20 blur-3xl rounded-full" />
           <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-4">Last Telemetry Check</p>
           <div className="space-y-1">
             <h3 className="text-4xl font-black tracking-tight leading-none text-slate-900">
-              {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {metrics?.timestamp 
+                ? new Date(metrics.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : '--:--'}
             </h3>
             <p className="text-slate-500 text-sm font-medium">
-              {new Date().toLocaleDateString([], { month: 'long', day: 'numeric' })}
+              {metrics?.timestamp 
+                 ? new Date(metrics.timestamp * 1000).toLocaleDateString([], { month: 'long', day: 'numeric' })
+                 : 'Waiting for signal...'}
             </p>
           </div>
           <div className="mt-8 pt-6 border-t border-blue-100/50 flex items-center justify-between">
             <span className="text-[10px] font-bold text-slate-400 uppercase">Status</span>
-            <span className="text-[10px] font-bold text-emerald-600 uppercase">No issues detected</span>
+            <span className={`text-[10px] font-bold uppercase ${isDbOnline ? 'text-emerald-600' : 'text-red-600'}`}>
+              {isDbOnline ? 'No issues detected' : 'Check Database'}
+            </span>
           </div>
         </div>
       </div>
