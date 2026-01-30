@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship
 import enum
 import datetime
 from database import Base
-from utils import IST, get_now_ist  # <--- Import from new utils file
+from utils import IST, get_now_ist
 
 class ScheduleStatus(str, enum.Enum):
     ACTIVE = "ACTIVE"
@@ -46,6 +46,10 @@ class Run(Base):
     status = Column(String)
     status_code = Column(Integer)
     latency_ms = Column(Integer)
+    
+    response_size = Column(Integer, nullable=True)
+    error_type = Column(String, nullable=True)
+    request_headers = Column(JSON, nullable=True)
     response_body = Column(Text, nullable=True)
     
     schedule = relationship("Schedule", back_populates="runs")
