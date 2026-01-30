@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, text
 from typing import List, Optional
 
-# Import your modules
 from database import engine, Base, get_db, SessionLocal
 import models
 import schemas
@@ -15,7 +14,6 @@ from core_logic import IST, ScheduleContext, JobExecutor, DatabaseLoggerObserver
 from models import ScheduleStatus, RunStatus
 from fastapi.middleware.cors import CORSMiddleware
 
-# Create DB Tables
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="API Scheduler")
@@ -28,7 +26,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- BACKGROUND SCHEDULER ENGINE ---
 def run_scheduler():
     """
     Background thread that polls for due schedules.
@@ -38,10 +35,8 @@ def run_scheduler():
     while True:
         try:
             db = SessionLocal()
-            # FIX: Use IST time to match the aware timestamps from your strategy
             now = datetime.datetime.now(IST)
             
-            # Fetch active schedules that are due
             due_schedules = db.query(models.Schedule).filter(
                 models.Schedule.next_run_at <= now,
                 models.Schedule.status == ScheduleStatus.ACTIVE.value
@@ -51,10 +46,8 @@ def run_scheduler():
                 executor = JobExecutor()
                 executor.add_observer(DatabaseLoggerObserver(db))
                 
-                # Execute Job
                 executor.execute(schedule, db)
 
-                # Calculate next run
                 next_time = ScheduleContext.get_next_run(schedule, db_session=db)
                 
                 if next_time:
@@ -75,11 +68,6 @@ def run_scheduler():
 def start_scheduler_thread():
     t = threading.Thread(target=run_scheduler, daemon=True)
     t.start()
-
-
-# --- API ENDPOINTS ---
-
-# === TARGETS ===
 
 @app.post("/targets/", response_model=schemas.TargetResponse, status_code=status.HTTP_201_CREATED)
 def create_target(target: schemas.TargetCreate, db: Session = Depends(get_db)):
@@ -113,9 +101,6 @@ def delete_target(target_id: int, db: Session = Depends(get_db)):
     db.delete(target)
     db.commit()
     return None
-
-
-# === SCHEDULES ===
 
 @app.post("/schedules/", response_model=schemas.ScheduleResponse, status_code=status.HTTP_201_CREATED)
 def create_schedule(schedule: schemas.ScheduleCreate, db: Session = Depends(get_db)):
@@ -178,9 +163,6 @@ def delete_schedule(schedule_id: int, db: Session = Depends(get_db)):
     db.commit()
     return None
 
-
-# === RUNS (HISTORY) ===
-
 @app.get("/runs/", response_model=List[schemas.RunResponse])
 def list_runs(
     schedule_id: Optional[int] = None, 
@@ -209,8 +191,6 @@ def get_run(run_id: int, db: Session = Depends(get_db)):
     if not run:
         raise HTTPException(status_code=404, detail="Run log not found")
     return run
-
-# === METRICS ===
 
 @app.get("/metrics")
 def get_dashboard_metrics(db: Session = Depends(get_db)):
