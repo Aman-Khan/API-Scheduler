@@ -2,20 +2,20 @@ import time
 import threading
 import datetime
 from fastapi import FastAPI, Depends, HTTPException, status
+import psutil
 from sqlalchemy.orm import Session
-from sqlalchemy import func, desc
+from sqlalchemy import func, desc, text
 from typing import List, Optional
 
 # Import your modules
 from database import engine, Base, get_db, SessionLocal
 import models
 import schemas
-from core_logic import ScheduleContext, JobExecutor, DatabaseLoggerObserver
+from core_logic import IST, ScheduleContext, JobExecutor, DatabaseLoggerObserver
 from models import ScheduleStatus, RunStatus
 from fastapi.middleware.cors import CORSMiddleware
 
-
-# Create DB Tables (safe to run multiple times, won't overwrite existing data unless dropped)
+# Create DB Tables
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="API Scheduler")
@@ -32,31 +32,29 @@ app.add_middleware(
 def run_scheduler():
     """
     Background thread that polls for due schedules.
-    Uses UTC time for consistency.
+    Standardized to IST to match the strategy logic.
     """
-    print("Background Scheduler Started...")
+    print("Background Scheduler Started (IST Mode)...")
     while True:
         try:
             db = SessionLocal()
-            # Use UTC to match database storage standard
-            now = datetime.datetime.utcnow()
+            # FIX: Use IST time to match the aware timestamps from your strategy
+            now = datetime.datetime.now(IST)
             
-            # 1. Fetch active schedules that are due
+            # Fetch active schedules that are due
             due_schedules = db.query(models.Schedule).filter(
                 models.Schedule.next_run_at <= now,
                 models.Schedule.status == ScheduleStatus.ACTIVE.value
             ).all()
 
             for schedule in due_schedules:
-                # 2. Execute the Job
-                # We use a fresh executor for each run to keep observers clean
                 executor = JobExecutor()
                 executor.add_observer(DatabaseLoggerObserver(db))
                 
-                # Execute logic (HTTP Request)
+                # Execute Job
                 executor.execute(schedule, db)
 
-                # 3. Calculate and Update Next Run Time
+                # Calculate next run
                 next_time = ScheduleContext.get_next_run(schedule, db_session=db)
                 
                 if next_time:
@@ -64,27 +62,17 @@ def run_scheduler():
                 else:
                     schedule.status = ScheduleStatus.COMPLETED.value
                 
-                if next_time:
-                    schedule.next_run_at = next_time
-                else:
-                    # If no next time (e.g. Window expired), mark completed
-                    schedule.status = ScheduleStatus.COMPLETED.value
-                
-                # Commit the changes for this schedule
                 db.commit()
             
             db.close()
             
         except Exception as e:
             print(f"Scheduler Critical Error: {e}")
-            # Prevent loop from crashing entirely, just wait and retry
         
-        # Poll every 5 seconds
         time.sleep(5)
 
 @app.on_event("startup")
 def start_scheduler_thread():
-    # Daemon thread ensures it dies when the main app stops
     t = threading.Thread(target=run_scheduler, daemon=True)
     t.start()
 
@@ -118,7 +106,6 @@ def delete_target(target_id: int, db: Session = Depends(get_db)):
     if not target:
         raise HTTPException(status_code=404, detail="Target not found")
     
-    # Check for active schedules using this target to prevent data corruption
     active_schedules = db.query(models.Schedule).filter(models.Schedule.target_id == target_id).count()
     if active_schedules > 0:
         raise HTTPException(status_code=400, detail="Cannot delete Target: It is being used by active Schedules.")
@@ -132,7 +119,6 @@ def delete_target(target_id: int, db: Session = Depends(get_db)):
 
 @app.post("/schedules/", response_model=schemas.ScheduleResponse, status_code=status.HTTP_201_CREATED)
 def create_schedule(schedule: schemas.ScheduleCreate, db: Session = Depends(get_db)):
-    # Validate Target Exists
     target = db.query(models.Target).filter(models.Target.id == schedule.target_id).first()
     if not target:
         raise HTTPException(status_code=404, detail="Target ID does not exist")
@@ -159,6 +145,12 @@ def pause_schedule(schedule_id: int, db: Session = Depends(get_db)):
     schedule = db.query(models.Schedule).filter(models.Schedule.id == schedule_id).first()
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
+    
+    if schedule.status == ScheduleStatus.COMPLETED.value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Cannot pause a schedule that is already COMPLETED."
+        )
     
     schedule.status = ScheduleStatus.PAUSED.value
     db.commit()
@@ -190,17 +182,24 @@ def delete_schedule(schedule_id: int, db: Session = Depends(get_db)):
 # === RUNS (HISTORY) ===
 
 @app.get("/runs/", response_model=List[schemas.RunResponse])
-def list_runs(schedule_id: Optional[int] = None, limit: int = 100, db: Session = Depends(get_db)):
-    """
-    Get run history. 
-    Optional Query Params:
-    - schedule_id: Filter by specific schedule
-    - limit: Max records to return (default 100)
-    """
+def list_runs(
+    schedule_id: Optional[int] = None, 
+    status: Optional[str] = None,
+    start_date: Optional[datetime.datetime] = None,
+    end_date: Optional[datetime.datetime] = None,
+    limit: int = 100, 
+    db: Session = Depends(get_db)
+):
     query = db.query(models.Run)
     
     if schedule_id:
         query = query.filter(models.Run.schedule_id == schedule_id)
+    if status:
+        query = query.filter(models.Run.status == status)
+    if start_date:
+        query = query.filter(models.Run.executed_at >= start_date)
+    if end_date:
+        query = query.filter(models.Run.executed_at <= end_date)
         
     return query.order_by(desc(models.Run.executed_at)).limit(limit).all()
 
@@ -211,22 +210,43 @@ def get_run(run_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Run log not found")
     return run
 
-
-# === OBSERVABILITY ===
+# === METRICS ===
 
 @app.get("/metrics")
-def get_system_metrics(db: Session = Depends(get_db)):
+def get_dashboard_metrics(db: Session = Depends(get_db)):
     """
-    Returns high-level aggregate metrics for the dashboard.
+    Returns unified telemetry: System Health + Application Performance.
     """
-    total_runs = db.query(func.count(models.Run.id)).scalar()
-    success_count = db.query(func.count(models.Run.id)).filter(models.Run.status == RunStatus.SUCCESS.value).scalar()
-    failure_count = db.query(func.count(models.Run.id)).filter(models.Run.status == RunStatus.FAILURE.value).scalar()
-    avg_latency = db.query(func.avg(models.Run.latency_ms)).scalar()
+    start_db = time.perf_counter()
+    try:
+        db.execute(text("SELECT 1"))
+        db_online = True
+    except Exception:
+        db_online = False
     
+    db_latency = round((time.perf_counter() - start_db) * 1000, 2)
+    cpu_usage = psutil.cpu_percent(interval=0.1)
+    
+    active_schedules_count = db.query(func.count(models.Schedule.id)).filter(
+        models.Schedule.status == ScheduleStatus.ACTIVE.value
+    ).scalar() or 0
+
+    total_runs = db.query(func.count(models.Run.id)).scalar() or 0
+    success_runs = db.query(func.count(models.Run.id)).filter(
+        models.Run.status == RunStatus.SUCCESS.value
+    ).scalar() or 0
+
+    avg_latency = db.query(func.avg(models.Run.latency_ms)).scalar()
+    avg_latency = round(avg_latency, 2) if avg_latency else 0
+
     return {
-        "total_runs": total_runs or 0,
-        "success_runs": success_count or 0,
-        "failed_runs": failure_count or 0,
-        "avg_latency_ms": round(avg_latency, 2) if avg_latency else 0.0
+        "timestamp": time.time(),
+        "database": {"online": db_online, "latency_ms": db_latency},
+        "system": {
+            "cpu_usage_percent": cpu_usage,
+            "active_workers": active_schedules_count,
+            "total_runs": total_runs,
+            "success_runs": success_runs,
+            "avg_latency_ms": avg_latency
+        }
     }
