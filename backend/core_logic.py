@@ -3,7 +3,11 @@ import requests
 import time
 from abc import ABC, abstractmethod
 from sqlalchemy.orm import Session
-from models import Schedule, Run, RunStatus, ScheduleStatus
+
+# Import Models
+from models import Run, RunStatus, Schedule
+# Import shared Utils
+from utils import IST 
 
 # --- 1. Strategy Pattern (Scheduling) ---
 class SchedulingStrategy(ABC):
@@ -12,8 +16,11 @@ class SchedulingStrategy(ABC):
         pass
 
 class IntervalStrategy(SchedulingStrategy):
-    # FIX: Added 'db: Session = None' to handle the argument passed by ScheduleContext
     def calculate_next_run(self, schedule: Schedule, last_run_time: datetime.datetime, db: Session = None) -> datetime.datetime:
+        # Ensure last_run_time is aware
+        if last_run_time.tzinfo is None:
+            last_run_time = last_run_time.replace(tzinfo=IST)
+            
         seconds = schedule.schedule_config.get('interval_seconds', 60)
         return last_run_time + datetime.timedelta(seconds=seconds)
 
@@ -21,20 +28,27 @@ class WindowStrategy(SchedulingStrategy):
     def calculate_next_run(self, schedule: Schedule, last_run_time: datetime.datetime, db: Session = None) -> datetime.datetime:
         config = schedule.schedule_config
         
-        # 1. Parse Window Limits
-        end_time = datetime.datetime.fromisoformat(config['end_time'])
+        # 1. Parse Window Limits & Ensure IST awareness
+        end_time_raw = datetime.datetime.fromisoformat(config['end_time'])
+        if end_time_raw.tzinfo is None:
+            end_time = end_time_raw.replace(tzinfo=IST)
+        else:
+            end_time = end_time_raw.astimezone(IST)
+            
         interval = config.get('interval_seconds', 60)
         max_runs = config.get('max_runs')
         
         # 2. Check Throttle (Max Runs)
         if max_runs and db:
-            # Count existing runs for this schedule
             run_count = db.query(Run).filter(Run.schedule_id == schedule.id).count()
             if run_count >= max_runs:
                 print(f"Throttle Limit Reached ({run_count}/{max_runs})")
-                return None # Stop scheduling
+                return None 
         
         # 3. Calculate Next Time
+        if last_run_time.tzinfo is None:
+            last_run_time = last_run_time.replace(tzinfo=IST)
+            
         next_run = last_run_time + datetime.timedelta(seconds=interval)
         
         # 4. Check Window End
@@ -54,9 +68,8 @@ class ScheduleContext:
         strategy = cls._strategies.get(schedule.schedule_type)
         if not strategy: return None
         
-        # Pass DB session to all strategies
-        # Now both IntervalStrategy and WindowStrategy accept this argument
-        return strategy.calculate_next_run(schedule, datetime.datetime.utcnow(), db=db_session)
+        current_time = datetime.datetime.now(IST)
+        return strategy.calculate_next_run(schedule, current_time, db=db_session)
 
 # --- 2. Observer Pattern (Monitoring) ---
 class JobObserver(ABC):
@@ -84,7 +97,6 @@ class JobExecutor:
         start_time = time.time()
         
         try:
-            # Actual HTTP Request
             response = requests.request(
                 method=schedule.target.method,
                 url=schedule.target.url,
@@ -93,7 +105,7 @@ class JobExecutor:
                 timeout=5
             )
             latency = int((time.time() - start_time) * 1000)
-            status_enum = RunStatus.SUCCESS if response.status_code < 400 else RunStatus.FAILURE
+            status_enum = RunStatus.SUCCESS.value if response.status_code < 400 else RunStatus.FAILURE.value
             
             run_record = Run(
                 schedule_id=schedule.id,
@@ -106,13 +118,12 @@ class JobExecutor:
             latency = int((time.time() - start_time) * 1000)
             run_record = Run(
                 schedule_id=schedule.id,
-                status=RunStatus.FAILURE,
+                status=RunStatus.FAILURE.value,
                 status_code=0,
                 latency_ms=latency,
                 response_body=str(e)
             )
 
-        # Notify Observers
         for obs in self.observers:
             obs.on_complete(run_record)
 

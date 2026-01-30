@@ -1,8 +1,9 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, ForeignKey
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
 import enum
+import datetime
 from database import Base
+from utils import IST, get_now_ist  # <--- Import from new utils file
 
 class ScheduleStatus(str, enum.Enum):
     ACTIVE = "ACTIVE"
@@ -15,7 +16,6 @@ class RunStatus(str, enum.Enum):
 
 class Target(Base):
     __tablename__ = 'targets'
-    # We keep 'id' as the DB primary key, but we will refer to it as target_id in API
     id = Column(Integer, primary_key=True, index=True)
     url = Column(String, nullable=False)
     method = Column(String, default="GET")
@@ -24,27 +24,25 @@ class Target(Base):
 
 class Schedule(Base):
     __tablename__ = 'schedules'
-    id = Column(Integer, primary_key=True, index=True) # This is schedule_id
-    
+    id = Column(Integer, primary_key=True, index=True)
     target_id = Column(Integer, ForeignKey('targets.id'))
-    
     schedule_type = Column(String, nullable=False) 
     schedule_config = Column(JSON, nullable=False) 
-    
     status = Column(String, default=ScheduleStatus.ACTIVE.value)
-    next_run_at = Column(DateTime, default=func.now(), index=True)
+    
+    # Use timezone=True so Postgres/SQLite handles it correctly
+    next_run_at = Column(DateTime(timezone=True), default=get_now_ist, index=True)
     
     target = relationship("Target")
     runs = relationship("Run", back_populates="schedule")
 
 class Run(Base):
     __tablename__ = 'runs'
-    id = Column(Integer, primary_key=True, index=True) # This is run_id
-    
-    # CLEARER NAME: schedule_id instead of job_id
+    id = Column(Integer, primary_key=True, index=True)
     schedule_id = Column(Integer, ForeignKey('schedules.id'))
     
-    executed_at = Column(DateTime, default=func.now())
+    executed_at = Column(DateTime(timezone=True), default=get_now_ist)
+    
     status = Column(String)
     status_code = Column(Integer)
     latency_ms = Column(Integer)

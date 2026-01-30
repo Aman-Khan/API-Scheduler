@@ -104,6 +104,23 @@ uvicorn main:app --reload
 
 ```
 
+4. **Setup Frontend:**
+```bash
+cd ../frontend
+
+```
+
+5. **Install Dependencies:**
+```bash
+npm install
+
+```
+
+6. **Run Server:**
+```bash
+npm run dev
+
+```
 
 The API will start at `http://127.0.0.1:8000`.
 
