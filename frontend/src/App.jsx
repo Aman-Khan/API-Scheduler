@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import Targets from './pages/Targets';
 import Schedules from './pages/Schedules';
 import Runs from './pages/Runs';
+import ActivityLog from './pages/ActivityLog';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,6 +27,7 @@ function App() {
             <Route path="/targets" element={<Targets />} />
             <Route path="/schedules" element={<Schedules />} />
             <Route path="/runs" element={<Runs />} />
+            <Route path="/activity" element={<ActivityLog />} />
           </Routes>
         </Layout>
       </BrowserRouter>
