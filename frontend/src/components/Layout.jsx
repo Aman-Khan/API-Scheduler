@@ -8,6 +8,7 @@ const Layout = ({ children }) => {
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/targets', icon: Target, label: 'Targets' },
     { path: '/schedules', icon: Calendar, label: 'Schedules' },
+    { path: '/activity', icon: History, label: 'Activities' },
     { path: '/runs', icon: History, label: 'Run History' },
   ];
 
