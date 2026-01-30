@@ -59,7 +59,6 @@ const Targets = () => {
     }
   };
 
-  // LIGHT THEME BADGES
   const getMethodBadge = (method) => {
     const styles = {
       GET: 'bg-blue-50 text-blue-700 border-blue-200',
@@ -83,7 +82,6 @@ const Targets = () => {
 
   return (
     <div className="space-y-6">
-      {/* --- Header --- */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h3 className="text-xl font-bold text-slate-800 tracking-tight">API Targets</h3>
@@ -100,7 +98,6 @@ const Targets = () => {
         </button>
       </div>
 
-      {/* --- Targets Table (Light Theme) --- */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -164,12 +161,10 @@ const Targets = () => {
         </div>
       </div>
 
-      {/* --- Create Target Modal (Light Theme) --- */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white border border-slate-200 rounded-xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
             
-            {/* Modal Header */}
             <div className="flex items-center justify-between p-5 border-b border-slate-100">
               <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                 <Plus className="w-5 h-5 text-blue-600" /> New API Target
@@ -182,11 +177,9 @@ const Targets = () => {
               </button>
             </div>
 
-            {/* Modal Body */}
             <div className="p-6 overflow-y-auto">
               <form onSubmit={handleSubmit} className="space-y-5">
                 
-                {/* URL Input */}
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Target URL *</label>
                   <div className="relative">
@@ -202,7 +195,6 @@ const Targets = () => {
                   </div>
                 </div>
 
-                {/* Method Select */}
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">HTTP Method *</label>
                   <select
@@ -219,7 +211,6 @@ const Targets = () => {
                   </select>
                 </div>
 
-                {/* Headers Input */}
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                     <Braces className="w-3 h-3" /> Headers (JSON)
@@ -232,7 +223,6 @@ const Targets = () => {
                   />
                 </div>
 
-                {/* Body Input */}
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                     <Code className="w-3 h-3" /> Body Template (Optional)
@@ -246,7 +236,6 @@ const Targets = () => {
                   <p className="text-xs text-slate-500 mt-1">Accepts standard JSON payload.</p>
                 </div>
 
-                {/* Footer Buttons */}
                 <div className="flex gap-3 pt-4 border-t border-slate-100 mt-6">
                   <button
                     type="button"

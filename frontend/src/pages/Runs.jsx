@@ -5,12 +5,10 @@ import { getRuns, getSchedules } from '../api/client';
 import { formatDateTime } from '../utils/dateUtils';
 
 const Runs = () => {
-  // --- Filter States ---
   const [selectedSchedule, setSelectedSchedule] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
-  // 1. Fetch Schedules
   const { data: schedules } = useQuery({
     queryKey: ['schedules'],
     queryFn: async () => {
@@ -19,7 +17,6 @@ const Runs = () => {
     },
   });
 
-  // 2. Fetch Runs (with Status & Date Filters)
   const { data: runs, isLoading, refetch } = useQuery({
     queryKey: ['runs', selectedSchedule, selectedStatus, dateRange],
     queryFn: async () => {
@@ -36,7 +33,6 @@ const Runs = () => {
     refetchInterval: 3000,
   });
 
-  // Light Mode Badges
   const getStatusBadge = (status) => {
     if (status === 'SUCCESS') {
       return (
@@ -54,7 +50,6 @@ const Runs = () => {
     );
   };
 
-  // Light Mode Text Colors
   const getStatusCodeColor = (code) => {
     if (code >= 200 && code < 300) return 'text-green-600';
     if (code >= 400 && code < 500) return 'text-yellow-600';
@@ -76,7 +71,6 @@ const Runs = () => {
 
   return (
     <div className="space-y-6">
-      {/* --- Header Section --- */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h3 className="text-xl font-bold text-slate-800 tracking-tight">Run History</h3>
@@ -93,11 +87,9 @@ const Runs = () => {
         </button>
       </div>
 
-      {/* --- Filter Bar (Light Theme) --- */}
       <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
           
-          {/* Schedule Select */}
           <div className="lg:col-span-4 space-y-1.5">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
               <Filter className="w-3 h-3" /> Schedule
@@ -124,7 +116,6 @@ const Runs = () => {
             </div>
           </div>
 
-          {/* Status Select */}
           <div className="lg:col-span-2 space-y-1.5">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Status</label>
             <select
@@ -138,7 +129,6 @@ const Runs = () => {
             </select>
           </div>
 
-          {/* Date Range Group */}
           <div className="lg:col-span-5 space-y-1.5">
             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
               <Calendar className="w-3 h-3" /> Time Range
@@ -159,7 +149,6 @@ const Runs = () => {
             </div>
           </div>
 
-          {/* Clear Button */}
           <div className="lg:col-span-1 flex justify-end pb-1">
             {hasActiveFilters && (
               <button
@@ -174,7 +163,6 @@ const Runs = () => {
         </div>
       </div>
 
-      {/* --- Stats Cards (Light Theme) --- */}
       {runs && runs.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm">
@@ -205,7 +193,6 @@ const Runs = () => {
         </div>
       )}
 
-      {/* --- Runs Table (Light Theme) --- */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -271,7 +258,6 @@ const Runs = () => {
         </div>
       </div>
 
-      {/* Footer Indicator */}
       <div className="flex items-center justify-center gap-2 text-xs text-slate-500 pt-4">
         <div className="relative flex h-2 w-2">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>

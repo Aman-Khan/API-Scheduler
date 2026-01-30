@@ -85,13 +85,11 @@ const Schedules = () => {
       if (!formData.end_time) { alert("End Time is required"); return; }
       
       const now = new Date();
-      // Add buffer (e.g., 1 minute) to allow for submission delay if user picks "now"
       const nowWithBuffer = new Date(now.getTime() - 60000); 
 
       const startTime = formData.start_time ? new Date(formData.start_time) : new Date();
       const endTime = new Date(formData.end_time);
 
-      // --- VALIDATION: Start Time cannot be in the past ---
       if (formData.start_time && startTime < nowWithBuffer) {
         alert("Start time cannot be in the past.");
         return;
@@ -152,11 +150,8 @@ const Schedules = () => {
     );
   };
 
-  // Helper to get current datetime string for min attribute
   const getCurrentDateTimeString = () => {
     const now = new Date();
-    // Format: YYYY-MM-DDThh:mm (slice removes seconds/ms)
-    // Need to adjust for local timezone offset for the input value
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
     return now.toISOString().slice(0, 16);
   };
@@ -165,7 +160,6 @@ const Schedules = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h3 className="text-xl font-bold text-slate-800 tracking-tight">Schedules</h3>
@@ -176,7 +170,6 @@ const Schedules = () => {
         </button>
       </div>
 
-      {/* Table */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -338,7 +331,6 @@ const Schedules = () => {
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Start Time</label>
-                          {/* Added min={getCurrentDateTimeString()} to the input */}
                           <input 
                             type="datetime-local" 
                             className="w-full bg-white border border-slate-300 text-slate-700 text-sm rounded-lg p-2.5" 

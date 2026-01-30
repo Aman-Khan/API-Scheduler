@@ -1,28 +1,23 @@
 import { useQuery } from '@tanstack/react-query';
 import { Activity, TrendingUp, CheckCircle2, Zap, Clock, ShieldCheck, ArrowUpRight, Cpu } from 'lucide-react';
-// Ensure this imports your fetch wrapper correctly
 import { getMetrics } from '../api/client'; 
 
 const Dashboard = () => {
   const { data: metrics, isLoading, isError } = useQuery({
     queryKey: ['dashboard_metrics'],
     queryFn: async () => {
-      // Make sure your client hits the new endpoint '/metrics/dashboard'
       const response = await getMetrics(); 
       return response.data;
     },
     refetchInterval: 5000,
   });
 
-  // 1. Safe Accessors (Handle loading/undefined states)
   const system = metrics?.system || {};
   const db = metrics?.database || {};
 
-  // 2. Logic extraction
   const isDbOnline = db.online;
   const isHighLoad = system.cpu_usage_percent > 80;
 
-  // 3. Calculate Success Rate (Using the new nested data)
   const successRate = system.total_runs > 0
     ? ((system.success_runs / system.total_runs) * 100).toFixed(1)
     : 0;
@@ -33,7 +28,6 @@ const Dashboard = () => {
   return (
     <div className="p-8 max-w-[1400px] mx-auto space-y-8 bg-slate-50/30">
       
-      {/* 💎 Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-200 pb-8">
         <div>
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">System Metrics</h1>
@@ -53,10 +47,8 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* 📊 The "Float" Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
-        {/* Total Runs Card */}
         <div className="relative overflow-hidden bg-white border border-slate-200/60 p-6 rounded-[1.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] group">
           <div className="absolute -right-4 -top-4 text-blue-500/5 group-hover:scale-110 transition-transform">
              <TrendingUp size={120} />
@@ -67,7 +59,6 @@ const Dashboard = () => {
             </div>
             <div className="text-right">
                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Runs</p>
-               {/* Update: Read from system.total_runs */}
                <h3 className="text-3xl font-black text-slate-900 tabular-nums">{system.total_runs || 0}</h3>
             </div>
           </div>
@@ -76,7 +67,6 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Success Rate Card */}
         <div className="relative overflow-hidden bg-white border border-slate-200/60 p-6 rounded-[1.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] group">
           <div className="flex items-center justify-between mb-6">
             <div className="p-3 rounded-2xl bg-emerald-50 text-emerald-600 shadow-inner">
@@ -92,7 +82,6 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Avg Latency Card */}
         <div className="relative overflow-hidden bg-white border border-slate-200/60 p-6 rounded-[1.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] group">
           <div className="flex items-center justify-between mb-6">
             <div className="p-3 rounded-2xl bg-amber-50 text-amber-600 shadow-inner">
@@ -100,7 +89,6 @@ const Dashboard = () => {
             </div>
             <div className="text-right">
                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Performance</p>
-               {/* Update: Read from system.avg_latency_ms */}
                <h3 className="text-3xl font-black text-slate-900 tabular-nums">
                 {system.avg_latency_ms ? `${system.avg_latency_ms.toFixed(0)}ms` : '0ms'}
                </h3>
@@ -110,7 +98,6 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* 📉 Advanced Status Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white border border-slate-200/60 rounded-[1.5rem] p-8 shadow-sm">
           <div className="flex items-center justify-between mb-8">
@@ -150,7 +137,6 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* 🕒 Time Card */}
         <div className="bg-blue-50/50 border border-blue-100 rounded-[1.5rem] p-8 relative overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
           <div className="absolute top-0 right-0 w-32 h-32 bg-blue-200/20 blur-3xl rounded-full" />
           <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-4">Last Telemetry Check</p>
